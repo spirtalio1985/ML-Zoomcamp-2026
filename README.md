@@ -540,8 +540,32 @@ Ubuntu machine, creates a kind cluster, applies the manifests in `k8s/`, waits f
 sends the example requests of `send_request.py` through the Kubernetes service. The job fails
 when the answers differ from the ones shown in [section 7.6](#76-start-the-web-service-locally).
 
-All runs are public: <https://github.com/spirtalio1985/ML-Zoomcamp-2026/actions/workflows/ci.yml>.
-The summary page of a run shows the pods, the service and the answers of the deployed model.
+The runs are public. Screenshot of
+[run #2](https://github.com/spirtalio1985/ML-Zoomcamp-2026/actions/runs/43942564338), with the
+notes of the Docker and Kubernetes jobs expanded:
+
+![Docker container and Kubernetes deployment tested in GitHub Actions](images/deployment.png)
+
+Output of the Kubernetes job in that run:
+
+```console
+$ kubectl get pods,services
+NAME                                       READY   STATUS    RESTARTS   AGE
+pod/purchase-prediction-6bfd99d58f-77dq7   1/1     Running   0          19s
+
+NAME                          TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+service/kubernetes            ClusterIP   10.96.0.1      <none>        443/TCP   48s
+service/purchase-prediction   ClusterIP   10.96.30.248   <none>        80/TCP    19s
+
+$ kubectl port-forward service/purchase-prediction 9696:80 &
+$ python send_request.py
+GET /health -> {'status': 'ok', 'model': 'HistGradientBoostingClassifier', 'threshold': 0.33}
+POST /predict [engaged visitor (many product pages, high page value)] -> {'purchase_probability': 0.773323, 'purchase': True, 'threshold': 0.33}
+POST /predict [bounce (one product page, left immediately)] -> {'purchase_probability': 0.010392, 'purchase': False, 'threshold': 0.33}
+```
+
+All runs: <https://github.com/spirtalio1985/ML-Zoomcamp-2026/actions/workflows/ci.yml>. On the
+page of a run, the "Annotations" box shows the pods, the service and the answers of the model.
 
 No public instance is kept running, to avoid costs; option A gives a public URL in a few minutes.
 
@@ -582,7 +606,7 @@ distributions in production.
 | Model deployment | [`predict.py`](predict.py) (FastAPI), [section 8](#8-web-service-api) |
 | Dependency and environment management | `pyproject.toml`, `uv.lock`, virtual environment created by `uv sync`; installation and activation in [section 7.2](#72-get-the-code-and-install-the-dependencies) |
 | Containerization | [`Dockerfile`](Dockerfile); build and run commands in [section 9](#9-docker) |
-| Cloud deployment | Fly.io commands and Kubernetes manifests (`k8s/`) in [section 10](#10-cloud-and-kubernetes-deployment); the Kubernetes deployment is created and tested in CI, see [Proof of deployment](#proof-of-deployment) |
+| Cloud deployment | Fly.io commands and Kubernetes manifests (`k8s/`) in [section 10](#10-cloud-and-kubernetes-deployment); the Kubernetes deployment is created and tested in CI, with a screenshot and a link to the run under [Proof of deployment](#proof-of-deployment) |
 
 ---
 

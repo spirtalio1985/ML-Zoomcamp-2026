@@ -153,6 +153,15 @@ jobs:
           grep --fixed-strings --quiet "'purchase_probability': 0.773323, 'purchase': True" "${RUNNER_TEMP}/docker-test.log"
           grep --fixed-strings --quiet "'purchase_probability': 0.010392, 'purchase': False" "${RUNNER_TEMP}/docker-test.log"
 
+      - name: Send the curl example of the README
+        run: |
+          curl --fail --silent -X POST http://localhost:9696/predict \
+            -H "Content-Type: application/json" \
+            -d '{"administrative": 3, "administrative_duration": 87.5, "informational": 0, "informational_duration": 0.0, "product_related": 34, "product_related_duration": 1280.4, "bounce_rates": 0.004, "exit_rates": 0.017, "page_values": 21.3, "special_day": 0.0, "month": "Nov", "operating_systems": 2, "browser": 2, "region": 1, "traffic_type": 2, "visitor_type": "Returning_Visitor", "weekend": false}' \
+            | tee "${RUNNER_TEMP}/curl-test.log"
+          echo
+          grep --fixed-strings --quiet '"purchase_probability":0.640714,"purchase":true,"threshold":0.33' "${RUNNER_TEMP}/curl-test.log"
+
       - name: Publish the result on the summary page of the run
         run: |
           {
