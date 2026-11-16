@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: purchase-prediction
+  labels:
+    app: purchase-prediction
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: purchase-prediction
+  template:
+    metadata:
+      labels:
+        app: purchase-prediction
+    spec:
+      containers:
+        - name: purchase-prediction
+          # Built locally with `docker build -t purchase-prediction:v1 .`
+          # and loaded into the cluster with `kind load docker-image`.
+          image: purchase-prediction:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9696
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 9696
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9696
+            initialDelaySeconds: 10
+            periodSeconds: 10
