@@ -130,7 +130,8 @@ of every column are in [`data/README.md`](data/README.md).
 
 ## 4. EDA highlights
 
-The full analysis is in [`notebook.ipynb`](notebook.ipynb) (sections 2 to 5). It covers data types
+The full analysis is in [`notebook.ipynb`](notebook.ipynb) (sections 2 to 5; also readable on
+[nbviewer](https://nbviewer.org/github/spirtalio1985/ML-Zoomcamp-2026/blob/main/notebook.ipynb)). It covers data types
 and ranges, missing values, duplicates, the target, every numerical and categorical feature,
 correlations, and a feature importance analysis. The integrity checks use the whole file; the
 analysis of the target and the features (notebook sections 4 and 5) uses the training part only.
@@ -255,9 +256,11 @@ commands used here are cross-platform; where a command differs on Windows, both 
 
 ### 7.2 Get the code and install the dependencies
 
-Clone this repository, open a terminal in its root folder and run:
+Clone this repository and install the environment from its root folder:
 
 ```bash
+git clone https://github.com/spirtalio1985/ML-Zoomcamp-2026.git
+cd ML-Zoomcamp-2026
 uv sync --locked
 ```
 
@@ -330,7 +333,10 @@ or re-execute it from the command line (about five minutes on a 2-core machine):
 jupyter nbconvert --to notebook --execute --inplace notebook.ipynb
 ```
 
-The notebook is committed with all outputs, so it can also be read directly on GitHub.
+The notebook is committed with all outputs, so it can also be read directly on GitHub. The file
+is about 1 MB with its figures, and the first preview on GitHub can take up to half a minute. If
+GitHub shows "Unable to render code block", reload the page or open the notebook in
+[nbviewer](https://nbviewer.org/github/spirtalio1985/ML-Zoomcamp-2026/blob/main/notebook.ipynb).
 
 ### 7.5 Run the tests
 
@@ -370,9 +376,9 @@ clean Ubuntu machine. The workflow repeats the steps of this README:
 
 | Job | What it does |
 |---|---|
-| Tests and training script | checks the checksum of the dataset, installs the environment from `uv.lock`, runs `pytest`, runs `train.py` and compares its results and the retrained model with the values in this README and with `model.bin` |
+| Tests and training script | checks the dataset (checksum, comparison with the file offered by UCI), installs the environment from `uv.lock`, runs `pytest`, runs `train.py` and compares its results and the retrained model with the values in this README and with `model.bin` |
 | Notebook | re-executes `notebook.ipynb` from top to bottom |
-| Docker image | builds the image, starts the container and sends the example requests |
+| Docker image | builds the image, starts the container and sends the example requests of `send_request.py` and the curl example of [section 8](#8-web-service-api) |
 | Kubernetes deployment | creates a kind cluster, deploys the manifests in `k8s/` and sends the example requests through the service |
 
 The results of all runs are public:
