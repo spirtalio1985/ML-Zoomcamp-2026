@@ -153,21 +153,28 @@ jobs:
           grep --fixed-strings --quiet "'purchase_probability': 0.773323, 'purchase': True" "${RUNNER_TEMP}/docker-test.log"
           grep --fixed-strings --quiet "'purchase_probability': 0.010392, 'purchase': False" "${RUNNER_TEMP}/docker-test.log"
 
-      - name: Add the result to the run summary
+      - name: Publish the result on the summary page of the run
         run: |
           {
-            echo "### Docker image"
-            echo
-            echo "Image built from the \`Dockerfile\`, started with \`docker run -p 9696:9696 ${IMAGE}\` and tested with \`send_request.py\`."
-            echo
-            echo '```console'
             echo "\$ docker image ls ${IMAGE}"
             docker image ls "${IMAGE}"
             echo
+            echo "\$ docker run -d -p 9696:9696 ${IMAGE}"
             echo '$ python send_request.py'
             cat "${RUNNER_TEMP}/docker-test.log"
+          } > "${RUNNER_TEMP}/docker-result.txt"
+          {
+            echo "### Docker image"
+            echo
+            echo '```console'
+            cat "${RUNNER_TEMP}/docker-result.txt"
             echo '```'
           } >> "${GITHUB_STEP_SUMMARY}"
+          message="$(cat "${RUNNER_TEMP}/docker-result.txt")"
+          message="${message//'%'/'%25'}"
+          message="${message//$'\r'/'%0D'}"
+          message="${message//$'\n'/'%0A'}"
+          echo "::notice title=Docker container test::${message}"
 
       - name: Container logs
         if: always()
@@ -215,22 +222,28 @@ jobs:
           grep --fixed-strings --quiet "'purchase_probability': 0.773323, 'purchase': True" "${RUNNER_TEMP}/kubernetes-test.log"
           grep --fixed-strings --quiet "'purchase_probability': 0.010392, 'purchase': False" "${RUNNER_TEMP}/kubernetes-test.log"
 
-      - name: Add the result to the run summary
+      - name: Publish the result on the summary page of the run
         run: |
           {
-            echo "### Kubernetes deployment (kind)"
-            echo
-            echo "Image loaded into a local kind cluster, deployed with the manifests in \`k8s/\` and tested through the \`purchase-prediction\` service."
-            echo
-            echo '```console'
             echo '$ kubectl get pods,services'
             kubectl get pods,services --context "${CONTEXT}"
             echo
             echo '$ kubectl port-forward service/purchase-prediction 9696:80 &'
             echo '$ python send_request.py'
             cat "${RUNNER_TEMP}/kubernetes-test.log"
+          } > "${RUNNER_TEMP}/kubernetes-result.txt"
+          {
+            echo "### Kubernetes deployment (kind)"
+            echo
+            echo '```console'
+            cat "${RUNNER_TEMP}/kubernetes-result.txt"
             echo '```'
           } >> "${GITHUB_STEP_SUMMARY}"
+          message="$(cat "${RUNNER_TEMP}/kubernetes-result.txt")"
+          message="${message//'%'/'%25'}"
+          message="${message//$'\r'/'%0D'}"
+          message="${message//$'\n'/'%0A'}"
+          echo "::notice title=Kubernetes deployment test (kind cluster)::${message}"
 
       - name: Pod description and logs
         if: always()

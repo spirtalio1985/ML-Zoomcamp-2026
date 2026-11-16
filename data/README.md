@@ -21,19 +21,15 @@
 
 The file is committed to the repository, so nothing has to be downloaded to run the project.
 
-**Provenance of this copy.** The file was taken from a public GitHub copy of the UCI file
-(`sidneykung/online_shopper_intentions`, `data/online_shoppers_intention.csv`, commit `95fd58c`).
-Before using it, it was checked that:
+**Provenance of this copy.** The file is byte-for-byte identical to `online_shoppers_intention.csv`
+in the archive that the UCI page offers for download
+(<https://archive.ics.uci.edu/static/public/468/online+shoppers+purchasing+intention+dataset.zip>).
+The CI workflow repeats this comparison on every run (job "Tests and training script"). The file
+also matches the summary published on the UCI page: 12,330 sessions, 17 features plus the target,
+no missing values, 10,422 sessions without and 1,908 sessions with a purchase.
 
-* a second, independent public copy (`sharmaroshan/Online-Shoppers-Purchasing-Intention`) is
-  byte-for-byte identical, and a third (`semnan-university-ai/Online-Shoppers-Purchasing-Intention`)
-  has identical content with Unix instead of Windows line endings;
-* it matches the summary published on the UCI page: 12,330 sessions, 17 features plus the target,
-  no missing values, 10,422 sessions without and 1,908 sessions with a purchase.
-
-It was not compared byte-for-byte with a fresh download from the UCI website. To do that, download
-`online_shoppers_intention.csv` from the UCI page above and compare the checksum (if only the line
-endings differ, the content is still the same):
+To check it by hand, download the archive from the UCI page above, extract
+`online_shoppers_intention.csv` and compare the checksum:
 
 ```bash
 sha256sum data/online_shoppers_intention.csv        # Linux
