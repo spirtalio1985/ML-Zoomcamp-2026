@@ -1,0 +1,243 @@
+name: CI
+
+# Runs every documented step of the project on a clean Linux machine:
+# the tests, the training script, the notebook, the Docker image and the
+# Kubernetes deployment (local cluster created with kind).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  UV_VERSION: "0.10.11" # same version as in the Dockerfile
+  IMAGE: purchase-prediction:v1
+  CLUSTER: purchase-prediction
+
+jobs:
+  tests:
+    name: Tests and training script
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check the dataset checksum
+        run: sha256sum --check <<< "b3055ee355f59134d851d32641183cb4a8b45def7124d2f50442a042f358e0d9  data/online_shoppers_intention.csv"
+
+      - name: Compare the dataset with a fresh download from UCI
+        run: |
+          url="https://archive.ics.uci.edu/static/public/468/online+shoppers+purchasing+intention+dataset.zip"
+          uci="${RUNNER_TEMP}/uci/online_shoppers_intention.csv"
+          if curl --fail --location --silent --show-error --max-time 120 --output "${RUNNER_TEMP}/uci.zip" "${url}" \
+            && unzip -o -q "${RUNNER_TEMP}/uci.zip" -d "${RUNNER_TEMP}/uci" \
+            && [[ -f "${uci}" ]]; then
+            sha256sum "${uci}" data/online_shoppers_intention.csv
+            if cmp --silent "${uci}" data/online_shoppers_intention.csv; then
+              echo "::notice::The committed dataset is byte-for-byte identical to the UCI download."
+            elif cmp --silent <(tr -d '\r' < "${uci}") <(tr -d '\r' < data/online_shoppers_intention.csv); then
+              echo "::notice::The committed dataset has the same content as the UCI download (only the line endings differ)."
+            else
+              echo "::warning::The committed dataset differs from the UCI download."
+            fi
+          else
+            echo "::notice::The UCI download was not available, comparison skipped."
+          fi
+
+      - name: Install uv
+        run: pipx install "uv==${UV_VERSION}"
+
+      - name: Create the virtual environment from uv.lock
+        run: uv sync --locked
+
+      - name: Run the tests
+        run: uv run pytest -v
+
+      - name: Train the model with train.py
+        run: uv run python train.py --output "${RUNNER_TEMP}/model.bin" | tee "${RUNNER_TEMP}/train.log"
+
+      - name: Check the results against the values documented in the README
+        run: |
+          grep --fixed-strings "ROC AUC = 0.9337 +- 0.0044 | average precision = 0.7474 +- 0.0122" "${RUNNER_TEMP}/train.log"
+          grep --fixed-strings "Decision threshold (max F1 on out-of-fold predictions): 0.33" "${RUNNER_TEMP}/train.log"
+          grep --fixed-strings "ROC AUC           = 0.9401" "${RUNNER_TEMP}/train.log"
+          grep --fixed-strings "average precision = 0.7801" "${RUNNER_TEMP}/train.log"
+          grep --fixed-strings "confusion matrix: TP = 289 | FP = 151 | FN = 93 | TN = 1933" "${RUNNER_TEMP}/train.log"
+
+      - name: Compare the retrained model with the committed model.bin
+        run: |
+          uv run python - <<'EOF'
+          import os
+          import pickle
+          from pathlib import Path
+
+          import numpy as np
+
+          from train import load_data, split_data, to_records
+
+          with open("model.bin", "rb") as f_in:
+              committed = pickle.load(f_in)
+          with open(Path(os.environ["RUNNER_TEMP"]) / "model.bin", "rb") as f_in:
+              retrained = pickle.load(f_in)
+
+          _, df_test = split_data(load_data())
+          records = to_records(df_test)
+          difference = np.max(
+              np.abs(committed["pipeline"].predict_proba(records)[:, 1] - retrained["pipeline"].predict_proba(records)[:, 1])
+          )
+          print(f"largest difference in predicted probability on the test set: {difference:.2e}")
+          print(f"threshold: committed {committed['threshold']:.2f} | retrained {retrained['threshold']:.2f}")
+          assert difference < 1e-6
+          assert committed["threshold"] == retrained["threshold"]
+          EOF
+
+  notebook:
+    name: Notebook (full re-execution)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        run: pipx install "uv==${UV_VERSION}"
+
+      - name: Create the virtual environment from uv.lock
+        run: uv sync --locked
+
+      - name: Execute the notebook from top to bottom
+        run: uv run jupyter nbconvert --to notebook --execute notebook.ipynb --output-dir "${RUNNER_TEMP}" --output notebook-executed.ipynb
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build the image
+        run: docker build -t "${IMAGE}" .
+
+      - name: Run the container
+        run: docker run --detach --name purchase-prediction -p 9696:9696 "${IMAGE}"
+
+      - name: Wait until the service answers
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://localhost:9696/health; then
+              echo
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs purchase-prediction
+          exit 1
+
+      - name: Install uv
+        run: pipx install "uv==${UV_VERSION}"
+
+      - name: Create the virtual environment from uv.lock
+        run: uv sync --locked
+
+      - name: Send the example requests to the container
+        run: |
+          uv run python send_request.py | tee "${RUNNER_TEMP}/docker-test.log"
+          grep --fixed-strings --quiet "'purchase_probability': 0.773323, 'purchase': True" "${RUNNER_TEMP}/docker-test.log"
+          grep --fixed-strings --quiet "'purchase_probability': 0.010392, 'purchase': False" "${RUNNER_TEMP}/docker-test.log"
+
+      - name: Add the result to the run summary
+        run: |
+          {
+            echo "### Docker image"
+            echo
+            echo "Image built from the \`Dockerfile\`, started with \`docker run -p 9696:9696 ${IMAGE}\` and tested with \`send_request.py\`."
+            echo
+            echo '```console'
+            echo "\$ docker image ls ${IMAGE}"
+            docker image ls "${IMAGE}"
+            echo
+            echo '$ python send_request.py'
+            cat "${RUNNER_TEMP}/docker-test.log"
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Container logs
+        if: always()
+        run: docker logs purchase-prediction
+
+  kubernetes:
+    name: Kubernetes deployment (kind)
+    runs-on: ubuntu-24.04
+    env:
+      CONTEXT: kind-purchase-prediction
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build the image
+        run: docker build -t "${IMAGE}" .
+
+      - name: Create a local cluster with kind
+        run: kind create cluster --name "${CLUSTER}" --wait 180s
+
+      - name: Load the image into the cluster
+        run: kind load docker-image "${IMAGE}" --name "${CLUSTER}"
+
+      - name: Deploy the manifests in k8s/
+        run: |
+          kubectl apply -f k8s/ --context "${CONTEXT}"
+          kubectl rollout status deployment/purchase-prediction --timeout=240s --context "${CONTEXT}"
+          kubectl get pods,services --context "${CONTEXT}"
+
+      - name: Install uv
+        run: pipx install "uv==${UV_VERSION}"
+
+      - name: Create the virtual environment from uv.lock
+        run: uv sync --locked
+
+      - name: Send the example requests through the Kubernetes service
+        run: |
+          kubectl port-forward service/purchase-prediction 9696:80 --context "${CONTEXT}" > "${RUNNER_TEMP}/port-forward.log" 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --output /dev/null http://localhost:9696/health; then
+              break
+            fi
+            sleep 1
+          done
+          uv run python send_request.py | tee "${RUNNER_TEMP}/kubernetes-test.log"
+          grep --fixed-strings --quiet "'purchase_probability': 0.773323, 'purchase': True" "${RUNNER_TEMP}/kubernetes-test.log"
+          grep --fixed-strings --quiet "'purchase_probability': 0.010392, 'purchase': False" "${RUNNER_TEMP}/kubernetes-test.log"
+
+      - name: Add the result to the run summary
+        run: |
+          {
+            echo "### Kubernetes deployment (kind)"
+            echo
+            echo "Image loaded into a local kind cluster, deployed with the manifests in \`k8s/\` and tested through the \`purchase-prediction\` service."
+            echo
+            echo '```console'
+            echo '$ kubectl get pods,services'
+            kubectl get pods,services --context "${CONTEXT}"
+            echo
+            echo '$ kubectl port-forward service/purchase-prediction 9696:80 &'
+            echo '$ python send_request.py'
+            cat "${RUNNER_TEMP}/kubernetes-test.log"
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Pod description and logs
+        if: always()
+        run: |
+          kubectl describe deployment/purchase-prediction --context "${CONTEXT}" || true
+          kubectl logs deployment/purchase-prediction --context "${CONTEXT}" || true
+
+      - name: Delete the cluster
+        if: always()
+        run: kind delete cluster --name "${CLUSTER}"

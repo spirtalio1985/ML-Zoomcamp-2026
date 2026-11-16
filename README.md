@@ -2,6 +2,8 @@
 
 **ML Zoomcamp 2026 · midterm project**
 
+[![CI](https://github.com/spirtalio1985/ML-Zoomcamp-2026/actions/workflows/ci.yml/badge.svg)](https://github.com/spirtalio1985/ML-Zoomcamp-2026/actions/workflows/ci.yml)
+
 A machine-learning service that estimates, from the way a visitor browses an online shop, the
 probability that the session ends with a purchase.
 
@@ -120,6 +122,7 @@ of every column are in [`data/README.md`](data/README.md).
 ├── .python-version            Python version used by uv
 ├── Dockerfile                 image of the web service
 ├── k8s/                       Kubernetes deployment and service
+├── .github/workflows/ci.yml   automated checks (tests, training, notebook, Docker, Kubernetes)
 └── images/                    figures used in this README
 ```
 
@@ -360,6 +363,21 @@ POST /predict [bounce (one product page, left immediately)] -> {'purchase_probab
 
 The interactive API documentation is at <http://localhost:9696/docs>.
 
+### 7.7 Automated checks
+
+Every push to this repository runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml) on a
+clean Ubuntu machine. The workflow repeats the steps of this README:
+
+| Job | What it does |
+|---|---|
+| Tests and training script | checks the checksum of the dataset, installs the environment from `uv.lock`, runs `pytest`, runs `train.py` and compares its results and the retrained model with the values in this README and with `model.bin` |
+| Notebook | re-executes `notebook.ipynb` from top to bottom |
+| Docker image | builds the image, starts the container and sends the example requests |
+| Kubernetes deployment | creates a kind cluster, deploys the manifests in `k8s/` and sends the example requests through the service |
+
+The results of all runs are public:
+<https://github.com/spirtalio1985/ML-Zoomcamp-2026/actions/workflows/ci.yml>
+
 ---
 
 ## 8. Web service (API)
@@ -516,9 +534,16 @@ For a remote cluster, push the image to a container registry and set the `image:
 
 ### Proof of deployment
 
-No public instance is kept running, to avoid costs. Either option above reproduces the deployment
-in a few minutes; the deployed service returns the same responses as the local run shown in
-[section 7.6](#76-start-the-web-service-locally).
+The Kubernetes deployment (option B) is created and tested automatically. On every push, the
+`kubernetes` job of the [CI workflow](.github/workflows/ci.yml) builds the Docker image on a clean
+Ubuntu machine, creates a kind cluster, applies the manifests in `k8s/`, waits for the rollout and
+sends the example requests of `send_request.py` through the Kubernetes service. The job fails
+when the answers differ from the ones shown in [section 7.6](#76-start-the-web-service-locally).
+
+All runs are public: <https://github.com/spirtalio1985/ML-Zoomcamp-2026/actions/workflows/ci.yml>.
+The summary page of a run shows the pods, the service and the answers of the deployed model.
+
+No public instance is kept running, to avoid costs; option A gives a public URL in a few minutes.
 
 ---
 
@@ -553,11 +578,11 @@ distributions in production.
 | EDA | `notebook.ipynb`, sections 2 to 5 (ranges, missing values, duplicates, target, every feature, correlations, feature importance); summary in [section 4](#4-eda-highlights) |
 | Model training | `notebook.ipynb`, sections 6 to 8: linear model, decision tree, random forest, XGBoost and gradient boosting, each with parameter tuning; summary in [section 5](#5-model-training-and-selection) |
 | Exporting notebook to script | [`train.py`](train.py) |
-| Reproducibility | Data committed in `data/`; exact dependencies in `uv.lock`; commands in [section 7](#7-how-to-run-the-project) |
+| Reproducibility | Data committed in `data/`; exact dependencies in `uv.lock`; commands in [section 7](#7-how-to-run-the-project); every step is re-run on a clean machine by the CI workflow ([section 7.7](#77-automated-checks)) |
 | Model deployment | [`predict.py`](predict.py) (FastAPI), [section 8](#8-web-service-api) |
 | Dependency and environment management | `pyproject.toml`, `uv.lock`, virtual environment created by `uv sync`; installation and activation in [section 7.2](#72-get-the-code-and-install-the-dependencies) |
 | Containerization | [`Dockerfile`](Dockerfile); build and run commands in [section 9](#9-docker) |
-| Cloud deployment | Fly.io commands and Kubernetes manifests (`k8s/`) in [section 10](#10-cloud-and-kubernetes-deployment) |
+| Cloud deployment | Fly.io commands and Kubernetes manifests (`k8s/`) in [section 10](#10-cloud-and-kubernetes-deployment); the Kubernetes deployment is created and tested in CI, see [Proof of deployment](#proof-of-deployment) |
 
 ---
 
