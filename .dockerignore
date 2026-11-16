@@ -1,0 +1,17 @@
+# Keep the build context small: the image only needs the files copied in the Dockerfile.
+.git
+.gitignore
+.gitattributes
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.ipynb_checkpoints
+data
+images
+k8s
+tests
+notebook.ipynb
+train.py
+send_request.py
+README.md

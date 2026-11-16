@@ -1,0 +1,41 @@
+[project]
+name = "online-shopper-purchase-prediction"
+version = "0.1.0"
+description = "ML Zoomcamp 2026 midterm project: will this online shopping session end with a purchase?"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+
+# Runtime dependencies: everything the web service (predict.py) needs.
+# These are the only packages installed into the Docker image.
+dependencies = [
+    "fastapi==0.119.1",
+    "numpy==2.3.3",
+    "scikit-learn==1.7.2",
+    "uvicorn==0.38.0",
+]
+
+# Development dependencies: training, notebook (EDA + model selection) and tests.
+# `uv sync` installs them by default; the Dockerfile skips them with `--no-dev`.
+[dependency-groups]
+dev = [
+    "pandas",
+    "matplotlib",
+    "xgboost",
+    "notebook",
+    "nbconvert",
+    "ipykernel",
+    "pytest",
+    "httpx",
+    "requests",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = [
+    # third-party deprecation notice raised inside Starlette's test client
+    "ignore::DeprecationWarning:starlette.*",
+]

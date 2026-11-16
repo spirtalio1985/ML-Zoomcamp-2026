@@ -1,0 +1,4 @@
+# Store the dataset and the model byte-for-byte (no line-ending conversion on any OS),
+# so that the SHA-256 checksum documented in data/README.md stays valid after cloning.
+data/*.csv -text
+*.bin binary
