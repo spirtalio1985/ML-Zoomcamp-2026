@@ -333,10 +333,11 @@ or re-execute it from the command line (about five minutes on a 2-core machine):
 jupyter nbconvert --to notebook --execute --inplace notebook.ipynb
 ```
 
-The notebook is committed with all outputs, so it can also be read directly on GitHub. The file
-is about 1 MB with its figures, and the first preview on GitHub can take up to half a minute. If
-GitHub shows "Unable to render code block", reload the page or open the notebook in
+The notebook is committed with all outputs, so it can also be read directly on GitHub. If GitHub
+shows "Unable to render code block", reload the page or open the notebook in
 [nbviewer](https://nbviewer.org/github/spirtalio1985/ML-Zoomcamp-2026/blob/main/notebook.ipynb).
+The figures stored in the committed notebook are compressed (PNG with 256 colours) to keep the
+file small; re-executing the notebook draws the same figures in full colour depth.
 
 ### 7.5 Run the tests
 
